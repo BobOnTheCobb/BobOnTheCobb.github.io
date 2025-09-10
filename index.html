@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bob yea BOB</title>
+<style>
+  html, body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    font-family: Arial, sans-serif;
+    background: url('image.png') no-repeat center center fixed;
+    background-size: cover;
+  }
+
+  #popupOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right:0;
+    bottom:0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+  }
+
+  #popup {
+    background: white;
+    padding: 20px 30px;
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    max-width: 90vw;
+    width: 400px;
+  }
+
+  #popup label {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: bold;
+    font-size: 1.1em;
+  }
+
+  #popup input[type="text"] {
+    width: 100%;
+    padding: 8px;
+    font-size: 1em;
+    box-sizing: border-box;
+    margin-bottom: 15px;
+  }
+
+  #popup button {
+    padding: 10px 20px;
+    font-size: 1em;
+    cursor: pointer;
+  }
+
+  #embedWindow {
+    position: fixed;
+    top: 50px;
+    left: 50px;
+    width: 800px;
+    height: 600px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    user-select: none;
+    z-index: 10000;
+  }
+
+  #titleBar {
+    background: #0078D7;
+    color: white;
+    padding: 8px 12px;
+    cursor: grab;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  #titleBar.hidden {
+    display: none;
+  }
+
+  #titleBar button {
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    line-height: 1;
+  }
+
+  #iframeContainer {
+    flex-grow: 1;
+    overflow: hidden;
+  }
+
+  #iframeContainer iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    pointer-events: auto;
+  }
+
+  #embedWindow .resize-handle {
+    position: absolute;
+    background: transparent;
+  }
+  #embedWindow .resize-handle.corner {
+    width: 12px;
+    height: 12px;
+  }
+  #embedWindow .resize-handle.edge {
+    background: transparent;
+  }
+
+  #embedWindow .resize-handle.n { top: -4px; left: 0; right: 0; height: 8px; cursor: ns-resize; }
+  #embedWindow .resize-handle.s { bottom: -4px; left: 0; right: 0; height: 8px; cursor: ns-resize; }
+  #embedWindow .resize-handle.e { right: -4px; top: 0; bottom: 0; width: 8px; cursor: ew-resize; }
+  #embedWindow .resize-handle.w { left: -4px; top: 0; bottom: 0; width: 8px; cursor: ew-resize; }
+
+  #embedWindow .resize-handle.ne.corner { top: -6px; right: -6px; cursor: nesw-resize; }
+  #embedWindow .resize-handle.nw.corner { top: -6px; left: -6px; cursor: nwse-resize; }
+  #embedWindow .resize-handle.se.corner { bottom: -6px; right: -6px; cursor: nwse-resize; }
+  #embedWindow .resize-handle.sw.corner { bottom: -6px; left: -6px; cursor: nesw-resize; }
+</style>
+</head>
+<body>
+
+<div id="popupOverlay">
+  <div id="popup">
+    <label for="urlInput">Enter the URL to embed:</label>
+    <input type="text" id="urlInput" placeholder="https://example.com" />
+    <button id="loadBtn">Load</button>
+  </div>
+</div>
+
+<div id="embedWindow">
+  <div id="titleBar">
+    <div>Embedded Site</div>
+    <button id="toggleBarBtn" title="Toggle title bar">−</button>
+  </div>
+  <div id="iframeContainer">
+    <iframe src="" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+  </div>
+
+  <div class="resize-handle n"></div>
+  <div class="resize-handle s"></div>
+  <div class="resize-handle e"></div>
+  <div class="resize-handle w"></div>
+
+  <div class="resize-handle ne corner"></div>
+  <div class="resize-handle nw corner"></div>
+  <div class="resize-handle se corner"></div>
+  <div class="resize-handle sw corner"></div>
+</div>
+
+<script>
+  const popupOverlay = document.getElementById('popupOverlay');
+  const loadBtn = document.getElementById('loadBtn');
+  const urlInput = document.getElementById('urlInput');
+  const embedWindow = document.getElementById('embedWindow');
+  const titleBar = document.getElementById('titleBar');
+  const toggleBarBtn = document.getElementById('toggleBarBtn');
+  const iframe = embedWindow.querySelector('iframe');
+
+  loadBtn.addEventListener('click', () => {
+    let url = urlInput.value.trim();
+    if (!url) {
+      alert('Please enter a URL');
+      return;
+    }
+    if (!/^https?:\/\//i.test(url)) {
+      url = 'https://' + url;
+    }
+
+    try {
+      new URL(url);
+    } catch {
+      alert('Invalid URL');
+      return;
+    }
+
+    iframe.src = url;
+    popupOverlay.style.display = 'none';
+    embedWindow.style.display = 'flex';
+  });
+
+  urlInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      loadBtn.click();
+    }
+  });
+
+  let isDragging = false;
+  let dragOffsetX = 0;
+  let dragOffsetY = 0;
+
+  titleBar.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    dragOffsetX = e.clientX - embedWindow.offsetLeft;
+    dragOffsetY = e.clientY - embedWindow.offsetTop;
+    titleBar.style.cursor = 'grabbing';
+    e.preventDefault();
+  });
+
+  window.addEventListener('mouseup', () => {
+    isDragging = false;
+    titleBar.style.cursor = 'grab';
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    let x = e.clientX - dragOffsetX;
+    let y = e.clientY - dragOffsetY;
+
+    const maxX = window.innerWidth - embedWindow.offsetWidth;
+    const maxY = window.innerHeight - embedWindow.offsetHeight;
+    x = Math.min(Math.max(0, x), maxX);
+    y = Math.min(Math.max(0, y), maxY);
+
+    embedWindow.style.left = x + 'px';
+    embedWindow.style.top = y + 'px';
+  });
+
+  toggleBarBtn.addEventListener('click', () => {
+    if (titleBar.classList.contains('hidden')) {
+      titleBar.classList.remove('hidden');
+      toggleBarBtn.textContent = '−';
+    } else {
+      titleBar.classList.add('hidden');
+      toggleBarBtn.textContent = '+';
+    }
+  });
+
+  const handles = embedWindow.querySelectorAll('.resize-handle');
+  let isResizing = false;
+  let resizeDir = '';
+  let startX, startY, startWidth, startHeight, startLeft, startTop;
+
+  handles.forEach(handle => {
+    handle.addEventListener('mousedown', e => {
+      e.preventDefault();
+      isResizing = true;
+      resizeDir = Array.from(handle.classList).filter(c => c !== 'resize-handle').join(' ');
+      startX = e.clientX;
+      startY = e.clientY;
+      startWidth = embedWindow.offsetWidth;
+      startHeight = embedWindow.offsetHeight;
+      startLeft = embedWindow.offsetLeft;
+      startTop = embedWindow.offsetTop;
+      window.addEventListener('mousemove', resizeMouseMove);
+      window.addEventListener('mouseup', stopResize);
+    });
+  });
+
+  function resizeMouseMove(e) {
+    if (!isResizing) return;
+
+    let dx = e.clientX - startX;
+    let dy = e.clientY - startY;
+
+    let newWidth = startWidth;
+    let newHeight = startHeight;
+    let newLeft = startLeft;
+    let newTop = startTop;
+
+    const minWidth = 300;
+    const minHeight = 200;
+
+    if (resizeDir.includes('e')) {
+      newWidth = startWidth + dx;
+      if (newWidth < minWidth) newWidth = minWidth;
+    }
+    if (resizeDir.includes('s')) {
+      newHeight = startHeight + dy;
+      if (newHeight < minHeight) newHeight = minHeight;
+    }
+    if (resizeDir.includes('w')) {
+      newWidth = startWidth - dx;
+      if (newWidth < minWidth) {
+        newWidth = minWidth;
+        newLeft = startLeft + (startWidth - minWidth);
+      } else {
+        newLeft = startLeft + dx;
+      }
+    }
+    if (resizeDir.includes('n')) {
+      newHeight = startHeight - dy;
+      if (newHeight < minHeight) {
+        newHeight = minHeight;
+        newTop = startTop + (startHeight - minHeight);
+      } else {
+        newTop = startTop + dy;
+      }
+    }
+
+    if (newLeft < 0) {
+      newWidth += newLeft;
+      newLeft = 0;
+      if (newWidth < minWidth) newWidth = minWidth;
+    }
+    if (newLeft + newWidth > window.innerWidth) {
+      newWidth = window.innerWidth - newLeft;
+      if (newWidth < minWidth) {
+        newWidth = minWidth;
+        newLeft = window.innerWidth - minWidth;
+      }
+    }
+
+    if (newTop < 0) {
+      newHeight += newTop;
+      newTop = 0;
+      if (newHeight < minHeight) newHeight = minHeight;
+    }
+    if (newTop + newHeight > window.innerHeight) {
+      newHeight = window.innerHeight - newTop;
+      if (newHeight < minHeight) {
+        newHeight = minHeight;
+        newTop = window.innerHeight - minHeight;
+      }
+    }
+
+    embedWindow.style.width = newWidth + 'px';
+    embedWindow.style.height = newHeight + 'px';
+    embedWindow.style.left = newLeft + 'px';
+    embedWindow.style.top = newTop + 'px';
+  }
+
+  function stopResize() {
+    isResizing = false;
+    window.removeEventListener('mousemove', resizeMouseMove);
+    window.removeEventListener('mouseup', stopResize);
+  }
+</script>
+
+</body>
+</html>
